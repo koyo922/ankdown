@@ -188,7 +188,7 @@ def sub_for_matches(text, match_iter, sentinel):
     last_match_end = 0
     for match in match_iter:
         text_outside_matches.append(text[last_match_end:match.start()])
-        text_inside_matches.append(match.group(1))
+        text_inside_matches.append(match.groups()[-1])
         last_match_end = match.end()
     text_outside_matches.append(text[last_match_end:])
     text_with_substitutions = sentinel.join(text_outside_matches)
@@ -216,13 +216,16 @@ def html_from_math_and_markdown(fieldtext):
 
     fieldtext_with_envs_replaced, text_inside_envs = sub_for_matches(
         fieldtext, re.finditer(
-            r"\$\$(.*?)\$\$", fieldtext, re.MULTILINE | re.DOTALL), ENV_SENTINEL)
+            r"(?<=  )\$\$(\S.*?\S)\$\$", fieldtext, re.MULTILINE | re.DOTALL), ENV_SENTINEL)
 
     sentinel_text, text_inside_inlines = sub_for_matches(
         fieldtext_with_envs_replaced, re.finditer(
-            r"\$(.*?\S)\$", fieldtext_with_envs_replaced), INLINE_SENTINEL)
+            r"(?<=  )\$([^\n]*?\S)\$", fieldtext_with_envs_replaced), INLINE_SENTINEL)
 
-    html_with_sentinels = misaka.html(sentinel_text, extensions=("fenced-code",))
+    html_with_sentinels = misaka.html(sentinel_text, extensions=('tables', 'fenced-code', 'footnotes', 'autolink',
+                                                                 'strikethrough', 'underline', 'highlight', 'quote',
+                                                                 'no-intra-emphasis',
+                                                                 'space-headers', 'disable-indented-code',))
 
     reconstructable_text = []
     env_counter = 0
