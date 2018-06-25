@@ -247,10 +247,16 @@ def html_from_math_and_markdown(fieldtext):
     return ''.join(reconstructable_text)
 
 
+REGEX_LF_BEFORE_CODE_BLOCK = re.compile(r'\n+(?=```\S+\n)')
+
+
 def compile_field(field_lines, is_markdown):
     """Turn field lines into an HTML field suitable for Anki."""
     fieldtext = ''.join(field_lines)
     if is_markdown:
+        # expand/squeeze 1~many '\n'(s) into TWO-consecutive '\n' s
+        # so that code blocks got correctly rendered
+        fieldtext = REGEX_LF_BEFORE_CODE_BLOCK.sub(r'\n\n', fieldtext)
         result = html_from_math_and_markdown(fieldtext)
     else:
         result = fieldtext
