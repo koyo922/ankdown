@@ -166,11 +166,13 @@ class Card(object):
 
 class DeckCollection(dict):
     """Defaultdict for decks, but with stored name."""
+
     def __getitem__(self, deckname):
         if deckname not in self:
             deck_id = random.randrange(1 << 30, 1 << 31)
             self[deckname] = genanki.Deck(deck_id, deckname)
         return super(DeckCollection, self).__getitem__(deckname)
+
 
 def sub_for_matches(text, match_iter, sentinel):
     """Substitute a sentinel for every match in the iterable.
