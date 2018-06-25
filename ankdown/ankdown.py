@@ -254,7 +254,7 @@ def compile_field(field_lines, is_markdown):
         result = html_from_math_and_markdown(fieldtext)
     else:
         result = fieldtext
-    return result.replace("\n", " ")
+    return result.replace("\n", "&#10;")
 
 
 def produce_cards(infile, filename=None, deckname=None):
