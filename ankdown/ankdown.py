@@ -30,11 +30,13 @@ Second Card Back (note that tags are optional)
 ```
 
 Usage:
-    ankdown.py [-i INFILE | -r DIR] [-o OUTFILE | -p PACKAGENAME [-d DECKNAME | -D]]
+    ankdown.py [-u] [-i INFILE | -r DIR] [-o OUTFILE | -p PACKAGENAME [-d DECKNAME | -D]]
 
 Options:
     -h --help     Show this help message
     --version     Show version
+
+    -u --UTF8     using utf8 for file IO instead of default ASCII
 
     -i INFILE     Read the input from INFILE, rather than stdin.
     -r DIR        Recursively visit DIR, accumulating cards from `.md` files.
@@ -328,6 +330,11 @@ def cards_to_apkg(cards, output_name):
 def main():
     """Run the thing."""
     arguments = docopt(__doc__, version=VERSION)
+
+    from functools import partial
+    from builtins import open
+    if arguments['--UTF8']:
+        open = partial(open, encoding='utf8')
 
     in_arg = arguments['-i']
     out_arg = arguments['-o']
