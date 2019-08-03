@@ -54,6 +54,7 @@ import random
 import re
 import sys
 
+import markdown
 import misaka
 import genanki
 
@@ -195,59 +196,61 @@ def sub_for_matches(text, match_iter, sentinel):
     return text_with_substitutions, text_inside_matches
 
 
-def html_from_math_and_markdown(fieldtext):
-    """Turn a math and markdown piece of text into an HTML and Anki-math piece of text."""
-
-    # NOTE(ben): This is the hackiest of the hacky.
-
-    # Basically, we find all the things that look like they're delimited by `$$` signs,
-    # store them, and replace them with a non-printable character that seems very
-    # unlikely to show up in anybody's code.
-    # Then we do the same for things that look like they're delimited by `$` signs, with
-    # a different nonprintable character.
-    # We run the result through the markdown compiler, hoping (well, I checked) that the
-    # nonprintable characters don't get modified or removed, and then we walk the html
-    # string and replace all the instances of the nonprintable characters with their
-    # corresponding (slightly modified) text.
-
-    # This could be slightly DRYer but it's not that bad.
-    ENV_SENTINEL = '\1'
-    INLINE_SENTINEL = '\2'
-
-    fieldtext_with_envs_replaced, text_inside_envs = sub_for_matches(
-        fieldtext, re.finditer(
-            r"(?<=  )\$\$(\S.*?\S)\$\$", fieldtext, re.MULTILINE | re.DOTALL), ENV_SENTINEL)
-
-    sentinel_text, text_inside_inlines = sub_for_matches(
-        fieldtext_with_envs_replaced, re.finditer(
-            r"(?<=  )\$([^\n]*?\S)\$", fieldtext_with_envs_replaced), INLINE_SENTINEL)
-
-    html_with_sentinels = misaka.html(sentinel_text, extensions=('tables', 'fenced-code', 'footnotes', 'autolink',
-                                                                 'strikethrough', 'underline', 'highlight', 'quote',
-                                                                 'no-intra-emphasis',
-                                                                 'space-headers', 'disable-indented-code',))
-
-    reconstructable_text = []
-    env_counter = 0
-    inline_counter = 0
-    for c in html_with_sentinels:
-        if c == ENV_SENTINEL:
-            reconstructable_text.append("[$$]")
-            reconstructable_text.append(text_inside_envs[env_counter])
-            reconstructable_text.append("[/$$]")
-            env_counter += 1
-        elif c == INLINE_SENTINEL:
-            reconstructable_text.append("[$]")
-            reconstructable_text.append(text_inside_inlines[inline_counter])
-            reconstructable_text.append("[/$]")
-            inline_counter += 1
-        else:
-            reconstructable_text.append(c)
-
-    return ''.join(reconstructable_text)
+# def html_from_math_and_markdown(fieldtext):
+#     """Turn a math and markdown piece of text into an HTML and Anki-math piece of text."""
+#
+#     # NOTE(ben): This is the hackiest of the hacky.
+#
+#     # Basically, we find all the things that look like they're delimited by `$$` signs,
+#     # store them, and replace them with a non-printable character that seems very
+#     # unlikely to show up in anybody's code.
+#     # Then we do the same for things that look like they're delimited by `$` signs, with
+#     # a different nonprintable character.
+#     # We run the result through the markdown compiler, hoping (well, I checked) that the
+#     # nonprintable characters don't get modified or removed, and then we walk the html
+#     # string and replace all the instances of the nonprintable characters with their
+#     # corresponding (slightly modified) text.
+#
+#     # This could be slightly DRYer but it's not that bad.
+#     ENV_SENTINEL = '\1'
+#     INLINE_SENTINEL = '\2'
+#
+#     # fieldtext_with_envs_replaced, text_inside_envs = sub_for_matches(
+#     #     fieldtext, re.finditer(
+#     #         r"(?<=  )\$\$([\s\S]+?)\$\$", fieldtext, re.MULTILINE | re.DOTALL), ENV_SENTINEL)
+#     #
+#     # sentinel_text, text_inside_inlines = sub_for_matches(
+#     #     fieldtext_with_envs_replaced, re.finditer(
+#     #         r"(?<=  )\$([^\n]*?\S)\$", fieldtext_with_envs_replaced), INLINE_SENTINEL)
+#     sentinel_text = fieldtext
+#
+#     html_with_sentinels = misaka.html(sentinel_text, extensions=('tables', 'fenced-code', 'footnotes', 'autolink',
+#                                                                  'strikethrough', 'underline', 'highlight', 'quote',
+#                                                                  'no-intra-emphasis',
+#                                                                  'space-headers', 'disable-indented-code',))
+#
+#     reconstructable_text = []
+#     env_counter = 0
+#     inline_counter = 0
+#     for c in html_with_sentinels:
+#         if c == ENV_SENTINEL:
+#             # reconstructable_text.append("[$$]")
+#             # reconstructable_text.append(text_inside_envs[env_counter])
+#             # reconstructable_text.append("[/$$]")
+#             env_counter += 1
+#         elif c == INLINE_SENTINEL:
+#             # reconstructable_text.append("[$]")
+#             # reconstructable_text.append(text_inside_inlines[inline_counter])
+#             # reconstructable_text.append("[/$]")
+#             inline_counter += 1
+#         else:
+#             reconstructable_text.append(c)
+#
+#     return ''.join(reconstructable_text)
 
 
 REGEX_LF_BEFORE_CODE_BLOCK = re.compile(r'\n+(?=```\S+\n)')
+REGEX_DOUBLE_CURLY_BRACE_IN_MATH = re.compile(r'(\$\$[^\$]+?)}}([^\$]*?\$\$)')  # 回花括号
 
 
 def compile_field(field_lines, is_markdown):
@@ -257,7 +260,28 @@ def compile_field(field_lines, is_markdown):
         # expand/squeeze 1~many '\n'(s) into TWO-consecutive '\n' s
         # so that code blocks got correctly rendered
         fieldtext = REGEX_LF_BEFORE_CODE_BLOCK.sub(r'\n\n', fieldtext)
-        result = html_from_math_and_markdown(fieldtext)
+        # result = html_from_math_and_markdown(fieldtext)
+        fieldtext_escape = fieldtext.replace(r'\\', 'AAADOUBLE_SLASHBBB').replace('_', 'AAAUNDERSCOREBBB')
+        while REGEX_DOUBLE_CURLY_BRACE_IN_MATH.search(fieldtext_escape):  # 数学模式中的两个连续花括号；一个公式里可能有多处
+            fieldtext_escape = REGEX_DOUBLE_CURLY_BRACE_IN_MATH.sub(r'\1} }\2', fieldtext_escape)
+
+        # html_with_sentinels = misaka.html(sentinel_text, extensions=('tables', 'fenced-code', 'footnotes', 'autolink',
+        #                                                              'strikethrough', 'underline', 'highlight', 'quote',
+        #                                                              'no-intra-emphasis',
+        #                                                              'space-headers', 'disable-indented-code',))
+
+        # result1 = markdown.markdown(fieldtext_escape,
+        #                             extensions=['markdown.extensions.extra',
+        #                                         'markdown.extensions.def_list',
+        #                                         'markdown.extensions.codehilite',
+        #                                         'markdown.extensions.tables'])
+        result1 = misaka.html(fieldtext_escape, extensions=('tables', 'fenced-code', 'footnotes', 'autolink',
+                                                            'strikethrough', 'underline', 'highlight', 'quote',
+                                                            'no-intra-emphasis',
+                                                            'space-headers', 'disable-indented-code',))
+
+        # 下划线容易被markdown当成 <em>; 注意不要用 @@之类的特殊字符，导致语法错误 在code部分容易被 包裹成<span class='err'>
+        result = result1.replace('AAAUNDERSCOREBBB', '_').replace('AAADOUBLE_SLASHBBB', r'\\')
     else:
         result = fieldtext
     return result.replace("\n", "&#10;")
