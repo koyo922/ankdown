@@ -250,7 +250,6 @@ def sub_for_matches(text, match_iter, sentinel):
 
 
 REGEX_LF_BEFORE_CODE_BLOCK = re.compile(r'\n+(?=```\S+\n)')
-REGEX_DOUBLE_CURLY_BRACE_IN_MATH = re.compile(r'(\$\$[^\$]+?)}}([^\$]*?\$\$)')  # 回花括号
 
 
 def compile_field(field_lines, is_markdown):
@@ -260,30 +259,24 @@ def compile_field(field_lines, is_markdown):
         # expand/squeeze 1~many '\n'(s) into TWO-consecutive '\n' s
         # so that code blocks got correctly rendered
         fieldtext = REGEX_LF_BEFORE_CODE_BLOCK.sub(r'\n\n', fieldtext)
-        # result = html_from_math_and_markdown(fieldtext)
         fieldtext_escape = fieldtext.replace(r'\\', 'AAADOUBLE_SLASHBBB').replace('_', 'AAAUNDERSCOREBBB')
-        while REGEX_DOUBLE_CURLY_BRACE_IN_MATH.search(fieldtext_escape):  # 数学模式中的两个连续花括号；一个公式里可能有多处
-            fieldtext_escape = REGEX_DOUBLE_CURLY_BRACE_IN_MATH.sub(r'\1} }\2', fieldtext_escape)
 
         # html_with_sentinels = misaka.html(sentinel_text, extensions=('tables', 'fenced-code', 'footnotes', 'autolink',
         #                                                              'strikethrough', 'underline', 'highlight', 'quote',
         #                                                              'no-intra-emphasis',
         #                                                              'space-headers', 'disable-indented-code',))
 
-        # result1 = markdown.markdown(fieldtext_escape,
-        #                             extensions=['markdown.extensions.extra',
-        #                                         'markdown.extensions.def_list',
-        #                                         'markdown.extensions.codehilite',
-        #                                         'markdown.extensions.tables'])
         result1 = misaka.html(fieldtext_escape, extensions=('tables', 'fenced-code', 'footnotes', 'autolink',
                                                             'strikethrough', 'underline', 'highlight', 'quote',
                                                             'no-intra-emphasis',
                                                             'space-headers', 'disable-indented-code',))
 
         # 下划线容易被markdown当成 <em>; 注意不要用 @@之类的特殊字符，导致语法错误 在code部分容易被 包裹成<span class='err'>
-        result = result1.replace('AAAUNDERSCOREBBB', '_').replace('AAADOUBLE_SLASHBBB', r'\\')
+        result2 = result1.replace('AAAUNDERSCOREBBB', '_').replace('AAADOUBLE_SLASHBBB', r'\\')
+        result = result2.replace('::', ': :').replace('}}', '} }').replace('@{', '{{c1::').replace('@}', r'}}')
     else:
         result = fieldtext
+    result = re.sub(r'(<br/> ){2,}', '', result)  # 去掉连续的多个换行
     return result.replace("\n", "&#10;")
 
 
