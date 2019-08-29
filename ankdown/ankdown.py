@@ -261,7 +261,8 @@ def compile_field(field_lines, is_markdown):
         fieldtext = REGEX_LF_BEFORE_CODE_BLOCK.sub(r'\n\n', fieldtext)
         escape_math = (fieldtext.replace(r'\\', 'AAADOUBLE_SLASHBBB')
                        .replace('_', 'AAAUNDERSCOREBBB')
-                       .replace(r'\#', 'AAASLASH_SHARPBBB'))
+                       .replace(r'\#', 'AAASLASH_SHARPBBB')
+                       .replace(r'\{', 'AAASLASH_LBRACKBBB').replace(r'\}', 'AAASLASH_RBRACKBBB'))
 
         html = misaka.html(escape_math, extensions=('tables', 'fenced-code', 'footnotes', 'autolink',
                                                     'strikethrough', 'underline', 'highlight', 'quote',
@@ -271,7 +272,8 @@ def compile_field(field_lines, is_markdown):
         # 下划线容易被markdown当成 <em>; 注意不要用 @@之类的特殊字符，导致语法错误 在code部分容易被 包裹成<span class='err'>
         unescape_math = (html.replace('AAAUNDERSCOREBBB', '_')
                          .replace('AAADOUBLE_SLASHBBB', r'\\')
-                         .replace('AAASLASH_SHARPBBB', r'\#'))
+                         .replace('AAASLASH_SHARPBBB', r'\#')
+                         .replace('AAASLASH_LBRACKBBB', r'\{').replace('AAASLASH_RBRACKBBB', r'\}'))
 
         escape_cloze = unescape_math[:]  # 消除与原生Anki格式的歧
         while '::' in escape_cloze:
