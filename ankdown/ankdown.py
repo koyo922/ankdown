@@ -53,13 +53,13 @@ import os
 import random
 import re
 import sys
-from typing import Match
 
-import markdown
 import misaka
 import genanki
 
 from docopt import docopt
+
+from ankdown import textcolor2color
 
 VERSION = "0.4.0"
 
@@ -282,22 +282,11 @@ def compile_field(field_lines, is_markdown):
         while '}}' in escape_cloze:
             escape_cloze = escape_cloze.replace('}}', '} }')  # 注意可能有连续多段
         result = escape_cloze.replace('@{', '{{c1::').replace('@}', r'}}').replace('@:', r'::')  # 用新格式换回Anki
-        result = textcolor2color(result)
+        result = textcolor2color.conv(result)
     else:
         result = fieldtext
     result = re.sub(r'(<br/> ){2,}', '', result)  # 去掉连续的多个换行
     return result.replace("\n", "&#10;")
-
-
-def textcolor2color(latex_in):
-    """ 将mathcha中的 `\textcolor` 格式改成 mathjax兼容的 `color`格式 """
-    latex_out = re.sub(r"\\textcolor\[rgb\]\{([\d\.]+),([\d\.]+),([\d\.]+)\}", _rep_fn, latex_in)
-    return latex_out
-
-
-def _rep_fn(m: Match):
-    hex_color = '#' + ''.join([f"{int(float(g) * 255):02X}" for g in m.groups()])
-    return r'\color{%s}' % hex_color
 
 
 def produce_cards(infile, filename=None, deckname=None):
