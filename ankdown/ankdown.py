@@ -260,6 +260,23 @@ def compile_field(field_lines, is_markdown):
         # expand/squeeze 1~many '\n'(s) into TWO-consecutive '\n' s
         # so that code blocks got correctly rendered
         fieldtext = REGEX_LF_BEFORE_CODE_BLOCK.sub(r'\n\n', fieldtext)
+        
+        # 先保护数学公式
+        math_placeholders = {}
+        math_counter = 0
+        def protect_math(match):
+            nonlocal math_counter
+            placeholder = f'MATH_PLACEHOLDER_{math_counter}'
+            # 保持原始的换行符，不要转换为&#10;
+            math_placeholders[placeholder] = match.group(0)
+            math_counter += 1
+            return placeholder
+        
+        # 先匹配多行数学公式 $$...$$，注意用非贪婪模式
+        fieldtext = re.sub(r'\$\$(.*?)\$\$', protect_math, fieldtext, flags=re.DOTALL)
+        # 再匹配单行数学公式 $...$
+        fieldtext = re.sub(r'\$([^\$\n]+?)\$', protect_math, fieldtext)
+        
         escape_math = (fieldtext.replace(r'\\', 'AAADOUBLE_SLASHBBB')
                        .replace('_', 'AAAUNDERSCOREBBB')
                        .replace(r'\#', 'AAASLASH_SHARPBBB')
@@ -267,7 +284,7 @@ def compile_field(field_lines, is_markdown):
 
         html = misaka.html(escape_math, extensions=('tables', 'fenced-code', 'footnotes', 'autolink',
                                                     'strikethrough', 'underline', 'highlight', 'quote',
-                                                    'no-intra-emphasis',
+                                                    # 'no-intra-emphasis',  # 关闭这行，否则*包裹周围的字符会影响<em>解析
                                                     'space-headers', 'disable-indented-code',))
 
         # 下划线容易被markdown当成 <em>; 注意不要用 @@之类的特殊字符，导致语法错误 在code部分容易被 包裹成<span class='err'>
@@ -282,6 +299,11 @@ def compile_field(field_lines, is_markdown):
         while '}}' in escape_cloze:
             escape_cloze = escape_cloze.replace('}}', '} }')  # 注意可能有连续多段
         result = escape_cloze.replace('@{', '{{c1::').replace('@}', r'}}').replace('@:', r'::')  # 用新格式换回Anki
+        
+        # 恢复数学公式
+        for placeholder, math in math_placeholders.items():
+            result = result.replace(placeholder, math)
+            
         result = textcolor2color.conv(result)
     else:
         result = fieldtext
