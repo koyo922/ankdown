@@ -260,10 +260,11 @@ def compile_field(field_lines, is_markdown):
         # expand/squeeze 1~many '\n'(s) into TWO-consecutive '\n' s
         # so that code blocks got correctly rendered
         fieldtext = REGEX_LF_BEFORE_CODE_BLOCK.sub(r'\n\n', fieldtext)
-        
+
         # 先保护数学公式
         math_placeholders = {}
         math_counter = 0
+
         def protect_math(match):
             nonlocal math_counter
             placeholder = f'MATH_PLACEHOLDER_{math_counter}'
@@ -271,12 +272,28 @@ def compile_field(field_lines, is_markdown):
             math_placeholders[placeholder] = match.group(0)
             math_counter += 1
             return placeholder
-        
+
         # 先匹配多行数学公式 $$...$$，注意用非贪婪模式
         fieldtext = re.sub(r'\$\$(.*?)\$\$', protect_math, fieldtext, flags=re.DOTALL)
         # 再匹配单行数学公式 $...$
         fieldtext = re.sub(r'\$([^\$\n]+?)\$', protect_math, fieldtext)
-        
+
+        # 先保护 mermaid 代码块
+        mermaid_placeholders = {}
+        mermaid_counter = 0
+
+        def protect_mermaid(match):
+            nonlocal mermaid_counter
+            placeholder = f'MERMAID_PLACEHOLDER_{mermaid_counter}'
+            content = match.group(1).strip()  # 去掉前后的空白
+            # 不要在这里创建完整的 div，而是只保存内容
+            mermaid_placeholders[placeholder] = content
+            mermaid_counter += 1
+            return placeholder
+
+        # 匹配 mermaid 代码块
+        fieldtext = re.sub(r'```mermaid\n(.*?)```', protect_mermaid, fieldtext, flags=re.DOTALL)
+
         escape_math = (fieldtext.replace(r'\\', 'AAADOUBLE_SLASHBBB')
                        .replace('_', 'AAAUNDERSCOREBBB')
                        .replace(r'\#', 'AAASLASH_SHARPBBB')
@@ -299,11 +316,21 @@ def compile_field(field_lines, is_markdown):
         while '}}' in escape_cloze:
             escape_cloze = escape_cloze.replace('}}', '} }')  # 注意可能有连续多段
         result = escape_cloze.replace('@{', '{{c1::').replace('@}', r'}}').replace('@:', r'::')  # 用新格式换回Anki
-        
+
         # 恢复数学公式
         for placeholder, math in math_placeholders.items():
             result = result.replace(placeholder, math)
-            
+
+        # 恢复 mermaid 图表 - 在这里才创建完整的 div，并且转换换行符
+        for placeholder, content in mermaid_placeholders.items():
+            content_with_escaped_newlines = content.replace('\n', '&#10;')
+            # 确保最后一行内容后也有换行符
+            div = f"<div class='mermaid'>&#10;{content_with_escaped_newlines}&#10;</div>"
+            result = result.replace(placeholder, div)
+
+        # 移除由 misaka 添加的多余 <p> 标签
+        result = re.sub(r'<p>((?:<div class=\'mermaid\'>[\s\S]*?</div>))</p>', r'\1', result)
+
         result = textcolor2color.conv(result)
     else:
         result = fieldtext

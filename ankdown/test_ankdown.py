@@ -36,3 +36,18 @@ And some text after."""
     mkd_out = compile_field(mkd_in, is_markdown=True)
     expected = r"""<p>Here's a multiline equation:&#10;$$&#10;\begin{align*}&#10;y &= x^2 + 2x + 1 \\&#10;  &= (x+1)^2&#10;\end{align*}&#10;$$&#10;And some text after.</p>&#10;"""
     assert mkd_out == expected
+
+
+def test_mermaid():
+    mkd_in = r"""
+```mermaid
+graph TD
+    A --> B
+    B --> C
+    C --> D
+    D --> A
+```
+"""
+    mkd_out = compile_field(mkd_in, is_markdown=True)
+    expected = "<div class='mermaid'>&#10;graph TD&#10;    A --> B&#10;    B --> C&#10;    C --> D&#10;    D --> A&#10;</div>&#10;"
+    assert mkd_out == expected
